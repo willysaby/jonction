@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d3a4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jonction">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Paramètres de jonction</title>
+<style>
+:root{--bg:#eceff1;--card:#fff;--ink:#17252f;--mute:#5f6e78;--line:#d3dadf;--acc:#1d3a4f;--hot:#c8501e;--ok:#2e7d4f}
+@media (prefers-color-scheme:dark){:root{--bg:#10171c;--card:#1a242b;--ink:#e6ecef;--mute:#92a1ab;--line:#2c3a43;--acc:#7fb2d0;--hot:#f0895a}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+header{background:#1d3a4f;color:#fff;padding:12px 16px}
+header h1{margin:0;font-size:18px;font-weight:650}
+#etat{font-size:13px;opacity:.85;margin-top:2px}
+#etat.off{color:#ffc9a8;opacity:1}
+main{flex:1;overflow-y:auto;padding:14px 14px 90px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:14px 4px;border:0;background:none;font:inherit;font-weight:600;color:var(--mute);border-top:3px solid transparent}
+nav button.on{color:var(--acc);border-top-color:var(--hot)}
+section{display:none}section.on{display:block}
+label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
+select,input,textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.carte{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:8px;padding:12px 14px;margin-top:14px}
+.carte h2{margin:0 0 8px;font-size:19px}
+.carte .tag{font-size:12px;color:var(--ok);font-weight:600;margin-left:6px}
+.grille{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grille div span{display:block;font-size:12px;color:var(--mute)}
+.grille div b{font-size:20px;color:var(--hot)}
+.grille .pleine{grid-column:1/-1}
+.grille .pleine b{font-size:16px;color:var(--ink);font-weight:500}
+.pied{margin-top:8px;font-size:12px;color:var(--mute)}
+.tableau{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px;white-space:nowrap}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+th{position:sticky;top:0;background:var(--bg);font-weight:650}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;margin-top:18px;padding:14px;border:0;border-radius:8px;background:var(--acc);color:#fff;font:inherit;font-weight:650}
+@media (prefers-color-scheme:dark){.btn{color:#10171c}}
+.btn:disabled{opacity:.45}
+.msg{margin-top:12px;padding:10px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-size:14px}
+.vide{color:var(--mute);margin-top:24px;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>Paramètres de jonction</h1><div id="etat">Chargement…</div></header>
+<main>
+  <section id="s-rech" class="on">
+    <label for="matiere">Matière</label>
+    <select id="matiere"></select>
+    <div id="resultats"></div>
+  </section>
+  <section id="s-base">
+    <input id="filtre" type="search" placeholder="Filtrer (matière, presse, accessoire…)">
+    <div class="tableau"><table id="table"></table></div>
+    <p class="pied" id="compte"></p>
+  </section>
+  <section id="s-ajout">
+    <div id="hors" class="msg" style="display:none">Connexion requise pour enregistrer un paramètre.</div>
+    <label for="f-m">Matière</label><input id="f-m" list="l-m" autocomplete="off">
+    <label for="f-p">Presse</label><input id="f-p" list="l-p" autocomplete="off">
+    <datalist id="l-m"></datalist><datalist id="l-p"></datalist>
+    <div class="row2">
+      <div><label for="f-ts">Température supérieure</label><input id="f-ts" inputmode="decimal"></div>
+      <div><label for="f-ti">Température inférieure</label><input id="f-ti" inputmode="decimal"></div>
+      <div><label for="f-pr">Pression</label><input id="f-pr" inputmode="decimal"></div>
+      <div><label for="f-t">Temps</label><input id="f-t" inputmode="decimal"></div>
+    </div>
+    <label for="f-a">Accessoire</label><input id="f-a">
+    <label for="f-c">Commentaire</label><textarea id="f-c" rows="3"></textarea>
+    <button class="btn" id="envoyer">Enregistrer le paramètre</button>
+    <div id="retour"></div>
+  </section>
+</main>
+<nav>
+  <button data-s="s-rech" class="on">Recherche</button>
+  <button data-s="s-base">Base</button>
+  <button data-s="s-ajout">Ajout</button>
+</nav>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycby2S0noFuAqKNtG-PxIaxea-SH4XRdPyWFNttl3jktKs03N6XwR3JFl4Tvi6ZkLgycB/exec";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const vide = v => (v === "" || v == null) ? "—" : esc(v);
+const dateFr = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join("/") : (d || "");
+const tri = (a, b) => String(a).localeCompare(String(b), "fr", {numeric:true, sensitivity:"base"});
+
+let rows = [], maj = "";
+try { const c = JSON.parse(localStorage.getItem("cache") || "null"); if (c) { rows = c.rows; maj = c.maj; } } catch (e) {}
+
+function code() {
+  let c = localStorage.getItem("code");
+  if (!c) { c = prompt("Code d’accès de l’équipe :") || ""; if (c) localStorage.setItem("code", c); }
+  return c;
+}
+
+function etat() {
+  const e = $("#etat"), off = !navigator.onLine;
+  e.className = off ? "off" : "";
+  e.textContent = (off ? "Hors ligne · " : "") + (maj ? "données du " + maj : "aucune donnée");
+  $("#envoyer").disabled = off;
+  $("#hors").style.display = off ? "block" : "none";
+}
+
+async function synchro() {
+  etat();
+  if (!navigator.onLine) return;
+  try {
+    const r = await fetch(API_URL + "?code=" + encodeURIComponent(code()));
+    const j = await r.json();
+    if (j.error === "code") { localStorage.removeItem("code"); $("#etat").textContent = "Code incorrect, rouvre l’appli."; return; }
+    rows = j.rows;
+    maj = new Date().toLocaleString("fr-FR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+    localStorage.setItem("cache", JSON.stringify({rows, maj}));
+  } catch (e) { /* on garde la copie locale */ }
+  etat(); rendre();
+}
+
+function rendre() {
+  const mats = [...new Set(rows.map(r => r.m))].sort(tri);
+  const sel = $("#matiere"), cur = sel.value;
+  sel.innerHTML = '<option value="">Choisir une matière…</option>' + mats.map(m => `<option>${esc(m)}</option>`).join("");
+  if (mats.includes(cur)) sel.value = cur;
+  $("#l-m").innerHTML = mats.map(m => `<option value="${esc(m)}">`).join("");
+  $("#l-p").innerHTML = [...new Set(rows.map(r => r.p))].sort(tri).map(p => `<option value="${esc(p)}">`).join("");
+  cartes(); tableau();
+}
+
+function cartes() {
+  const m = $("#matiere").value, out = $("#resultats");
+  if (!m) { out.innerHTML = '<p class="vide">Choisis une matière pour voir ses paramètres.</p>'; return; }
+  const sel = rows.filter(r => r.m === m);
+  const presses = [...new Set(sel.map(r => r.p))].sort(tri);
+  out.innerHTML = presses.map(p => {
+    const l = sel.filter(r => r.p === p).sort((a, b) => String(b.d).localeCompare(String(a.d)));
+    return l.map((r, i) => `<div class="carte"><h2>${vide(p)}${l.length > 1 && i === 0 ? '<span class="tag">le plus récent</span>' : ""}</h2>
+      <div class="grille">
+        <div><span>Température supérieure</span><b>${vide(r.ts)}</b></div>
+        <div><span>Température inférieure</span><b>${vide(r.ti)}</b></div>
+        <div><span>Pression</span><b>${vide(r.pr)}</b></div>
+        <div><span>Temps</span><b>${vide(r.t)}</b></div>
+        <div class="pleine"><span>Accessoire</span><b>${vide(r.a)}</b></div>
+        <div class="pleine"><span>Commentaire</span><b>${vide(r.c)}</b></div>
+      </div><div class="pied">Validé le ${esc(dateFr(r.d)) || "—"}</div></div>`).join("");
+  }).join("");
+}
+
+function tableau() {
+  const q = $("#filtre").value.toLowerCase().trim();
+  const l = rows.filter(r => !q || [r.m, r.p, r.a, r.c].join(" ").toLowerCase().includes(q))
+                .sort((a, b) => tri(a.m, b.m) || tri(a.p, b.p));
+  $("#table").innerHTML = "<tr><th>Matière</th><th>Presse</th><th>T° sup.</th><th>T° inf.</th><th>Pression</th><th>Temps</th><th>Accessoire</th><th>Commentaire</th><th>Date</th></tr>" +
+    l.slice(0, 300).map(r => `<tr><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(r.t)}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
+  $("#compte").textContent = l.length + " ligne(s)" + (l.length > 300 ? " (300 affichées, affine le filtre)" : "");
+}
+
+async function envoyer() {
+  const g = id => $("#f-" + id).value.trim();
+  const data = {m:g("m"), p:g("p"), ts:g("ts"), ti:g("ti"), pr:g("pr"), t:g("t"), a:g("a"), c:g("c")};
+  const retour = $("#retour");
+  if (!data.m || !data.p) { retour.innerHTML = '<div class="msg">La matière et la presse sont obligatoires.</div>'; return; }
+  $("#envoyer").disabled = true; retour.innerHTML = '<div class="msg">Enregistrement…</div>';
+  try {
+    const r = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({code:code(), data})});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error);
+    ["m","p","ts","ti","pr","t","a","c"].forEach(i => $("#f-" + i).value = "");
+    retour.innerHTML = '<div class="msg">Paramètre enregistré.</div>';
+    synchro();
+  } catch (e) {
+    retour.innerHTML = '<div class="msg">Échec de l’enregistrement. Vérifie la connexion et réessaie.</div>';
+  }
+  etat();
+}
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); $("#" + b.dataset.s).classList.add("on");
+});
+$("#matiere").onchange = cartes;
+$("#filtre").oninput = tableau;
+$("#envoyer").onclick = envoyer;
+addEventListener("online", synchro);
+addEventListener("offline", etat);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) synchro(); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+rendre(); synchro();
+</script>
+</body>
+</html>
