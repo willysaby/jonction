@@ -44,6 +44,14 @@ th{position:sticky;top:0;background:var(--bg);font-weight:650}
 @media (prefers-color-scheme:dark){.btn{color:#10171c}}
 .btn:disabled{opacity:.45}
 .msg{margin-top:12px;padding:10px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-size:14px}
+tr[data-n]{cursor:pointer}
+.btn.sec{background:none;color:var(--acc);border:1px solid var(--line)}
+.btn.sup{background:var(--hot);color:#fff}
+dialog{width:min(92vw,520px);max-height:92vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:14px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.logo{display:block;width:100%;max-width:320px;margin:0 auto 4px;background:#fff;padding:8px 14px;border-radius:8px}
+#sugg{display:none;max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);margin-top:4px}
+#sugg button{display:block;width:100%;text-align:left;padding:13px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink)}
 .vide{color:var(--mute);margin-top:24px;text-align:center}
 </style>
 </head>
@@ -51,14 +59,17 @@ th{position:sticky;top:0;background:var(--bg);font-weight:650}
 <header><h1>Paramètres de jonction</h1><div id="etat">Chargement…</div></header>
 <main>
   <section id="s-rech" class="on">
+    <img class="logo" src="logo.png" alt="Novafit">
     <label for="matiere">Matière</label>
-    <select id="matiere"></select>
+    <input id="matiere" type="search" placeholder="Tape les premières lettres…" autocomplete="off">
+    <div id="sugg"></div>
     <div id="resultats"></div>
   </section>
   <section id="s-base">
     <input id="filtre" type="search" placeholder="Filtrer (matière, presse, accessoire…)">
     <div class="tableau"><table id="table"></table></div>
     <p class="pied" id="compte"></p>
+    <p class="pied">Touche une ligne pour la corriger (code administrateur).</p>
   </section>
   <section id="s-ajout">
     <div id="hors" class="msg" style="display:none">Connexion requise pour enregistrer un paramètre.</div>
@@ -77,6 +88,7 @@ th{position:sticky;top:0;background:var(--bg);font-weight:650}
     <div id="retour"></div>
   </section>
 </main>
+<dialog id="dlg"></dialog>
 <nav>
   <button data-s="s-rech" class="on">Recherche</button>
   <button data-s="s-base">Base</button>
@@ -92,7 +104,7 @@ const vide = v => (v === "" || v == null) ? "—" : esc(v);
 const dateFr = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join("/") : (d || "");
 const tri = (a, b) => String(a).localeCompare(String(b), "fr", {numeric:true, sensitivity:"base"});
 
-let rows = [], maj = "";
+let rows = [], maj = "", MATS = [];
 try { const c = JSON.parse(localStorage.getItem("cache") || "null"); if (c) { rows = c.rows; maj = c.maj; } } catch (e) {}
 
 function code() {
@@ -125,17 +137,24 @@ async function synchro() {
 
 function rendre() {
   const mats = [...new Set(rows.map(r => r.m))].sort(tri);
-  const sel = $("#matiere"), cur = sel.value;
-  sel.innerHTML = '<option value="">Choisir une matière…</option>' + mats.map(m => `<option>${esc(m)}</option>`).join("");
-  if (mats.includes(cur)) sel.value = cur;
+  MATS = mats;
   $("#l-m").innerHTML = mats.map(m => `<option value="${esc(m)}">`).join("");
   $("#l-p").innerHTML = [...new Set(rows.map(r => r.p))].sort(tri).map(p => `<option value="${esc(p)}">`).join("");
   cartes(); tableau();
 }
 
+function suggerer() {
+  const v = $("#matiere").value.trim().toLowerCase(), b = $("#sugg");
+  const l = MATS.filter(m => String(m).toLowerCase().startsWith(v));
+  b.innerHTML = l.map(m => `<button type="button" data-m="${esc(m)}">${esc(m)}</button>`).join("") ||
+    '<p class="vide" style="margin:12px">Aucune matière ne commence par « ' + esc(v) + " ».</p>";
+  b.style.display = "block";
+}
+
 function cartes() {
-  const m = $("#matiere").value, out = $("#resultats");
-  if (!m) { out.innerHTML = '<p class="vide">Choisis une matière pour voir ses paramètres.</p>'; return; }
+  const v = $("#matiere").value.trim().toLowerCase(), out = $("#resultats");
+  const m = MATS.find(x => String(x).toLowerCase() === v);
+  if (m === undefined) { out.innerHTML = '<p class="vide">' + (v ? "Choisis une matière dans la liste." : "Tape les premières lettres d’une matière.") + "</p>"; return; }
   const sel = rows.filter(r => r.m === m);
   const presses = [...new Set(sel.map(r => r.p))].sort(tri);
   out.innerHTML = presses.map(p => {
@@ -157,8 +176,57 @@ function tableau() {
   const l = rows.filter(r => !q || [r.m, r.p, r.a, r.c].join(" ").toLowerCase().includes(q))
                 .sort((a, b) => tri(a.m, b.m) || tri(a.p, b.p));
   $("#table").innerHTML = "<tr><th>Matière</th><th>Presse</th><th>T° sup.</th><th>T° inf.</th><th>Pression</th><th>Temps</th><th>Accessoire</th><th>Commentaire</th><th>Date</th></tr>" +
-    l.slice(0, 300).map(r => `<tr><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(r.t)}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
+    l.slice(0, 300).map(r => `<tr data-n="${r.n}"><td>${vide(r.m)}</td><td>${vide(r.p)}</td><td>${vide(r.ts)}</td><td>${vide(r.ti)}</td><td>${vide(r.pr)}</td><td>${vide(r.t)}</td><td>${vide(r.a)}</td><td>${vide(r.c)}</td><td>${esc(dateFr(r.d))}</td></tr>`).join("");
   $("#compte").textContent = l.length + " ligne(s)" + (l.length > 300 ? " (300 affichées, affine le filtre)" : "");
+}
+
+const CH = [["m","Matière"],["p","Presse"],["ts","Température supérieure"],["ti","Température inférieure"],["pr","Pression"],["t","Temps"],["a","Accessoire"],["c","Commentaire"]];
+let edN = null;
+
+function codeAdmin() {
+  let c = localStorage.getItem("admin");
+  if (!c) { c = prompt("Code administrateur :") || ""; if (c) localStorage.setItem("admin", c); }
+  return c;
+}
+
+async function appel(payload) {
+  const cle = codeAdmin();
+  if (!cle) throw new Error("code");
+  const r = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({code:cle, ...payload})});
+  const j = await r.json();
+  if (j.error === "code") localStorage.removeItem("admin");
+  return j;
+}
+
+function editer(n) {
+  if (!navigator.onLine) { alert("Connexion requise pour corriger une ligne."); return; }
+  const r = rows.find(x => x.n === n);
+  if (!r || !codeAdmin()) return;
+  edN = n;
+  $("#dlg").innerHTML = "<h2 style='margin:0 0 4px;font-size:18px'>Corriger la ligne</h2>" +
+    CH.map(([k, l]) => `<label for="e-${k}">${l}</label>` + (k === "c" ? `<textarea id="e-${k}" rows="3"></textarea>` : `<input id="e-${k}"${k === "m" ? ' list="l-m"' : k === "p" ? ' list="l-p"' : ""}>`)).join("") +
+    '<button class="btn" id="e-ok">Enregistrer la correction</button><button class="btn sup" id="e-sup">Supprimer la ligne</button><button class="btn sec" id="e-non">Annuler</button><div id="e-retour" class="pied"></div>';
+  CH.forEach(([k]) => $("#e-" + k).value = r[k] ?? "");
+  $("#e-ok").onclick = () => corriger(false);
+  $("#e-sup").onclick = () => corriger(true);
+  $("#e-non").onclick = () => $("#dlg").close();
+  $("#dlg").showModal();
+}
+
+async function corriger(suppr) {
+  const r = rows.find(x => x.n === edN), info = $("#e-retour");
+  const data = {}; CH.forEach(([k]) => data[k] = $("#e-" + k).value.trim());
+  if (!suppr && (!data.m || !data.p)) { info.textContent = "La matière et la presse sont obligatoires."; return; }
+  if (suppr && !confirm("Supprimer définitivement cette ligne ?")) return;
+  info.textContent = "Enregistrement…";
+  try {
+    const j = await appel({action: suppr ? "delete" : "edit", row: edN, orig: {m: r.m, p: r.p}, data});
+    if (!j.ok) throw new Error(j.error);
+    $("#dlg").close(); await synchro();
+  } catch (e) {
+    info.textContent = e.message === "code" ? "Code administrateur incorrect." : e.message === "obsolete" ? "Cette ligne a changé entre-temps : ferme la fenêtre, l’appli va se resynchroniser." : "Échec. Vérifie la connexion et réessaie.";
+    if (e.message === "obsolete") synchro();
+  }
 }
 
 async function envoyer() {
@@ -168,14 +236,13 @@ async function envoyer() {
   if (!data.m || !data.p) { retour.innerHTML = '<div class="msg">La matière et la presse sont obligatoires.</div>'; return; }
   $("#envoyer").disabled = true; retour.innerHTML = '<div class="msg">Enregistrement…</div>';
   try {
-    const r = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({code:code(), data})});
-    const j = await r.json();
+    const j = await appel({action:"add", data});
     if (!j.ok) throw new Error(j.error);
     ["m","p","ts","ti","pr","t","a","c"].forEach(i => $("#f-" + i).value = "");
     retour.innerHTML = '<div class="msg">Paramètre enregistré.</div>';
     synchro();
   } catch (e) {
-    retour.innerHTML = '<div class="msg">Échec de l’enregistrement. Vérifie la connexion et réessaie.</div>';
+    retour.innerHTML = '<div class="msg">' + (e.message === "code" ? "Code administrateur incorrect." : "Échec de l’enregistrement. Vérifie la connexion et réessaie.") + "</div>";
   }
   etat();
 }
@@ -184,9 +251,17 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, section").forEach(x => x.classList.remove("on"));
   b.classList.add("on"); $("#" + b.dataset.s).classList.add("on");
 });
-$("#matiere").onchange = cartes;
+$("#matiere").oninput = () => { suggerer(); cartes(); };
+$("#matiere").onfocus = e => { e.target.select(); suggerer(); };
+$("#matiere").onkeydown = e => { if (e.key === "Enter") { $("#sugg").style.display = "none"; e.target.blur(); } };
+$("#sugg").onclick = e => {
+  const b = e.target.closest("button[data-m]"); if (!b) return;
+  $("#matiere").value = b.dataset.m; $("#sugg").style.display = "none"; cartes();
+};
+document.addEventListener("click", e => { if (!e.target.closest("#matiere, #sugg")) $("#sugg").style.display = "none"; });
 $("#filtre").oninput = tableau;
 $("#envoyer").onclick = envoyer;
+$("#table").onclick = e => { const tr = e.target.closest("tr[data-n]"); if (tr) editer(+tr.dataset.n); };
 addEventListener("online", synchro);
 addEventListener("offline", etat);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) synchro(); });
